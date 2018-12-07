@@ -9,92 +9,10 @@
 #include <string>
 #include <cstdlib>
 #include <cstring>
-
-#define MNIST_TESTING_SET_IMAGE_FILE_NAME "data/t10k-images-idx3-ubyte"  ///< MNIST image testing file in the data folder
-#define MNIST_TESTING_SET_LABEL_FILE_NAME "data/t10k-labels-idx1-ubyte"  ///< MNIST label testing file in the data folder
-
-#define HIDDEN_WEIGHTS_FILE "net_params/hidden_weights.txt"
-#define HIDDEN_BIASES_FILE "net_params/hidden_biases.txt"
-#define OUTPUT_WEIGHTS_FILE "net_params/out_weights.txt"
-#define OUTPUT_BIASES_FILE "net_params/out_biases.txt"
-
-#define NUMBER_OF_INPUT_CELLS 784   ///< use 28*28 input cells (= number of pixels per MNIST image)
-#define NUMBER_OF_HIDDEN_CELLS 256   ///< use 256 hidden cells in one hidden layer
-#define NUMBER_OF_OUTPUT_CELLS 10   ///< use 10 output cells to model 10 digits (0-9)
-
-#define MNIST_MAX_TESTING_IMAGES 10000                      ///< number of images+labels in the TEST file/s
-#define MNIST_IMG_WIDTH 28                                  ///< image width in pixel
-#define MNIST_IMG_HEIGHT 28                                 ///< image height in pixel
-
+#include "utils.hpp"
+#include "globals.hpp"
 using namespace std;
 
-typedef struct MNIST_ImageFileHeader MNIST_ImageFileHeader;
-typedef struct MNIST_LabelFileHeader MNIST_LabelFileHeader;
-
-typedef struct MNIST_Image MNIST_Image;
-typedef uint8_t MNIST_Label;
-typedef struct Hidden_Node Hidden_Node;
-typedef struct Output_Node Output_Node;
-
-/**
- * @brief Data block defining a hidden cell
- */
-
-struct Hidden_Node{
-    double weights[28*28];
-    double bias;
-    double output;
-};
-
-/**
- * @brief Data block defining an output cell
- */
-
-struct Output_Node{
-    double weights[256];
-    double bias;
-    double output;
-};
-
-/**
- * @brief Data block defining a MNIST image
- * @see http://yann.lecun.com/exdb/mnist/ for details
- */
-
-struct MNIST_Image{
-    uint8_t pixel[28*28];
-};
-
-/**
- * @brief Data block defining a MNIST image file header
- * @attention The fields in this structure are not used.
- * What matters is their byte size to move the file pointer
- * to the first image.
- * @see http://yann.lecun.com/exdb/mnist/ for details
- */
-
-struct MNIST_ImageFileHeader{
-    uint32_t magicNumber;
-    uint32_t maxImages;
-    uint32_t imgWidth;
-    uint32_t imgHeight;
-};
-
-/**
- * @brief Data block defining a MNIST label file header
- * @attention The fields in this structure are not used.
- * What matters is their byte size to move the file pointer
- * to the first label.
- * @see http://yann.lecun.com/exdb/mnist/ for details
- */
-
-struct MNIST_LabelFileHeader{
-    uint32_t magicNumber;
-    uint32_t maxImages;
-};
-
-vector<Hidden_Node> hidden_nodes(NUMBER_OF_HIDDEN_CELLS);
-vector<Output_Node> output_nodes(NUMBER_OF_OUTPUT_CELLS);
 
 /**
  * @details Set cursor position to given coordinates in the terminal window
@@ -338,7 +256,6 @@ void allocateHiddenParameters(){
         for (int i = 0; i < 28*28; ++i){
             in >> hidden_nodes[idx].weights[i];
       }
-    //   idx++;
     }
     weights.close();
 
@@ -347,7 +264,6 @@ void allocateHiddenParameters(){
     {
         stringstream in(line);
         in >> hidden_nodes[bidx].bias;
-        // bidx++;
     }
     biases.close();
 
@@ -361,22 +277,20 @@ void allocateOutputParameters(){
     int idx = 0;
     int bidx = 0;
     ifstream weights(OUTPUT_WEIGHTS_FILE); //"layersinfo.txt"
-    for(string line; getline(weights, line); )   //read stream line by line
+    for(string line; getline(weights, line); ++idx)   //read stream line by line
     {
         stringstream in(line);
         for (int i = 0; i < 256; ++i){
             in >> output_nodes[idx].weights[i];
       }
-      idx++;
     }
     weights.close();
 
     ifstream biases(OUTPUT_BIASES_FILE);
-    for(string line; getline(biases, line); )   //read stream line by line
+    for(string line; getline(biases, line); ++bidx)   //read stream line by line
     {
         stringstream in(line);
         in >> output_nodes[bidx].bias;
-        bidx++;
     }
     biases.close();
 
@@ -402,89 +316,4 @@ int getNNPrediction(){
 
     return maxInd;
 
-}
-
-/**
- * @details test the neural networks to obtain its accuracy when classifying
- * 10k images.
- */
-
-void testNN(){
-        // open MNIST files
-    FILE *imageFile, *labelFile;
-    imageFile = openMNISTImageFile(MNIST_TESTING_SET_IMAGE_FILE_NAME);
-    labelFile = openMNISTLabelFile(MNIST_TESTING_SET_LABEL_FILE_NAME);
-
-
-    // screen output for monitoring progress
-    displayImageFrame(7,5);
-
-    // number of incorrect predictions
-    int errCount = 0;
-
-
-    // Loop through all images in the file
-    for (int imgCount=0; imgCount<MNIST_MAX_TESTING_IMAGES; imgCount++){
-        // display progress
-        displayLoadingProgressTesting(imgCount,5,5);
-
-        // Reading next image and corresponding label
-        MNIST_Image img = getImage(imageFile);
-        MNIST_Label lbl = getLabel(labelFile);
-
-        displayImage(&img, 8,6);
-
-        // loop through all output cells for the given image
-        for (int i= 0; i < NUMBER_OF_OUTPUT_CELLS; i++){
-            output_nodes[i].output = 0;
-            for (int j = 0; j < NUMBER_OF_HIDDEN_CELLS; j++) {
-                hidden_nodes[j].output = 0;
-                for (int z = 0; z < NUMBER_OF_INPUT_CELLS; z++) {
-                    hidden_nodes[j].output += img.pixel[z] * hidden_nodes[j].weights[z];
-                }
-                hidden_nodes[j].output += hidden_nodes[j].bias;
-                hidden_nodes[j].output = (hidden_nodes[j].output >= 0) ?  hidden_nodes[j].output : 0;
-                output_nodes[i].output += hidden_nodes[j].output * output_nodes[i].weights[j];
-            }
-            output_nodes[i].output += 1/(1+ exp(-1* output_nodes[i].output));
-        }
-
-        int predictedNum = getNNPrediction();
-        if (predictedNum!=lbl) errCount++;
-
-        printf("\n      Prediction: %d   Actual: %d ",predictedNum, lbl);
-
-        displayProgress(imgCount, errCount, 5, 66);
-
-    }
-
-    // Close files
-    fclose(imageFile);
-    fclose(labelFile);
-
-}
-int main(int argc, const char * argv[]) {
-
-    // remember the time in order to calculate processing time at the end
-    time_t startTime = time(NULL);
-
-    // clear screen of terminal window
-    clearScreen();
-    printf("    MNIST-NN: a simple 2-layer neural network processing the MNIST handwriting images\n");
-
-    // alocating respective parameters to hidden and output layer cells
-    allocateHiddenParameters();
-    allocateOutputParameters();
-
-    //test the neural network
-    testNN();
-
-    locateCursor(38, 5);
-
-    // calculate and print the program's total execution time
-    time_t endTime = time(NULL);
-    double executionTime = difftime(endTime, startTime);
-    printf("\n    DONE! Total execution time: %.1f sec\n\n",executionTime);
-
-    return 0;
 }

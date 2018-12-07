@@ -1,3 +1,6 @@
 net_params/
 data/
 *.pdf
+*.o
+*.out
+NeuralNetworkMultiThreadedTest
