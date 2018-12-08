@@ -15,7 +15,6 @@ public:
     Semaphore(const Semaphore&);
     void signal();
     void wait();
-    bool try_wait();
 };
 
 #endif

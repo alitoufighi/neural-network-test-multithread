@@ -1,8 +1,6 @@
 #include <stdint.h>
 #include <cstdio>
-#include <math.h>
 #include <vector>
-#include <time.h>
 #include <iostream>
 #include <sstream> //this header file is needed when using stringstream
 #include <fstream>
